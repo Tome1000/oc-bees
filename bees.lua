@@ -12,6 +12,7 @@ local t = component.transposer
 
 local CONFIG = {
   chain = {sides.left, sides.right},
+  scanner_side = sides.back,
   
   geneWeights = {
     ["species"] = 7,
@@ -42,6 +43,7 @@ local CONFIG = {
 
 local chest = CONFIG.chain[1]
 local apiary = CONFIG.chain[#CONFIG.chain]
+local scanner = CONFIG.scanner_side
 
 local STATE = {
   cycle_count = 0,
@@ -301,6 +303,96 @@ local function debugShowAllBees()
   log("", "DEBUG")
 end
 
+-- SCANNER
+
+local function findUnscannedInChest()
+  local size = t.getInventorySize(chest) or 0
+  local unscanned_slots = {}
+  
+  for i = 1, size do
+    local stack = t.getStackInSlot(chest, i)
+    if stack and stack.label and stack.individual == nil then
+      table.insert(unscanned_slots, i)
+    end
+  end
+  
+  return unscanned_slots
+end
+
+local function transferUnscannedToScanner()
+  local unscanned = findUnscannedInChest()
+  
+  if #unscanned == 0 then
+    log("Brak nieskanowanych pszczol", "INFO")
+    return 0
+  end
+  
+  log("Znaleziono " .. #unscanned .. " nieskanowanych pszczol, przesylam do skanera...", "SCANNER")
+  
+  local transferred = 0
+  for _, slot in ipairs(unscanned) do
+    local moved = t.transferItem(chest, scanner, 1, slot)
+    if moved and moved > 0 then
+      transferred = transferred + moved
+    end
+  end
+  
+  log("Przeslano " .. transferred .. " pszczol do skanera", "SCANNER")
+  return transferred
+end
+
+local function waitForScanningComplete()
+  local max_wait = 300
+  local waited = 0
+  
+  log("Czekanie na skanowanie pszczol...", "SCANNER")
+  
+  while waited < max_wait do
+    os.sleep(1)
+    waited = waited + 1
+    
+    local size = t.getInventorySize(scanner) or 0
+    if size == 0 then
+      log("Skanowanie zakonczono!", "SCANNER")
+      return true
+    end
+  end
+  
+  log("Timeout czekania na skanowanie", "WARN")
+  return false
+end
+
+local function transferScannedFromScanner()
+  local size = t.getInventorySize(scanner) or 0
+  
+  if size == 0 then
+    log("Skaner jest pusty", "INFO")
+    return 0
+  end
+  
+  log("Przenoszenie " .. size .. " pszczol z skanera do skrzyni...", "SCANNER")
+  
+  local transferred = 0
+  for i = 1, size do
+    local stack = t.getStackInSlot(scanner, i)
+    if stack then
+      local moved = t.transferItem(scanner, chest, stack.size, i)
+      if moved and moved > 0 then
+        transferred = transferred + moved
+      end
+    end
+  end
+  
+  log("Przeniesiono " .. transferred .. " pszczol z skanera", "SCANNER")
+  return transferred
+end
+
+local function scanAllUnscannedBees()
+  transferUnscannedToScanner()
+  waitForScanningComplete()
+  transferScannedFromScanner()
+end
+
 -- BEE SELECTION
 
 local function selectBee(bee_type, targetSpecies)
@@ -540,6 +632,8 @@ local function main()
   log("", "BANNER")
   
   debugShowAllBees()
+  
+  scanAllUnscannedBees()
   
   log("Nacisni ENTER aby zaczac, lub Ctrl+C aby anulowac...", "PROMPT")
   io.read()
