@@ -382,10 +382,12 @@ local function cycleIsDone()
   for i = 1, apiary_size do
     local stack = t.getStackInSlot(apiary, i)
     
-    if stack and stack.label then
-      local l = stack.label:lower()
-      if l:find("queen") or l:find("princess") or l:find("drone") then
-        return false
+    if stack then
+      if stack.individual then
+        local label = stack.label and stack.label:lower() or ""
+        if label:find("queen") or label:find("princess") or label:find("drone") then
+          return false
+        end
       end
     end
   end
