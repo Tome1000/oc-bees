@@ -388,6 +388,13 @@ local function transferScannedFromScanner()
 end
 
 local function scanAllUnscannedBees()
+  -- Check if there are any unscanned bees before attempting scan
+  local unscanned = findUnscannedInChest()
+  if #unscanned == 0 then
+    log("Wszystkie pszczoły są już przeskanowane", "INFO")
+    return
+  end
+  
   transferUnscannedToScanner()
   waitForScanningComplete()
   transferScannedFromScanner()
