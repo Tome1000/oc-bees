@@ -395,6 +395,8 @@ end
 
 -- BEE SELECTION
 
+local STATE_selected_slots = {}
+
 local function selectBee(bee_type, targetSpecies)
   bee_type = bee_type or "PRINCESS"
   targetSpecies = targetSpecies or nil
@@ -428,7 +430,9 @@ local function selectBee(bee_type, targetSpecies)
         log("  [SLOT " .. i .. "] " .. species .. " (" .. label .. ")", "INFO")
         log("    Purity: " .. purity .. "/2 | Score: " .. score, "INFO")
         
-        if purity >= CONFIG.min_purity and score >= CONFIG.min_score then
+        if STATE_selected_slots[i] then
+          log("    SKIP - Juz uzyta w tym cyklu", "SKIP")
+        elseif purity >= CONFIG.min_purity and score >= CONFIG.min_score then
           table.insert(candidates, {
             slot = i,
             label = label,
@@ -463,6 +467,7 @@ local function selectBee(bee_type, targetSpecies)
   log("WYBRANO: " .. best.species .. " (purity: " .. best.purity .. ", score: " .. best.score .. ")", "SELECT")
   log("", "SELECT")
   
+  STATE_selected_slots[best.slot] = true
   return best.slot
 end
 
@@ -520,6 +525,9 @@ local function insertBees()
   transferAcrossChain(1, #CONFIG.chain, 1, queen_slot, queen_slot_apiary)
   transferAcrossChain(1, #CONFIG.chain, 1, drone_slot, drone_slot_apiary)
   
+  STATE_selected_slots[queen_slot] = nil
+  STATE_selected_slots[drone_slot] = nil
+  
   log("Pszczoy wlozone do apairy", "SUCCESS")
   STATE.cycle_count = STATE.cycle_count + 1
   return true
@@ -533,8 +541,8 @@ local function collectProducts()
     local stack = t.getStackInSlot(apiary, i)
     
     if stack and stack.label then
-      local l = stack.label:lower()
-      if not (l:find("queen") or l:find("princess") or l:find("drone")) then
+      if not stack.individual then
+        local l = stack.label:lower()
         if l:find("comb") or l:find("honey") then
           local moved = transferAcrossChain(#CONFIG.chain, 1, stack.size, i)
           if moved and moved > 0 then
@@ -560,20 +568,17 @@ local function extractBees()
   for i = 1, apiary_size do
     local stack = t.getStackInSlot(apiary, i)
     
-    if stack and stack.label then
-      local l = stack.label:lower()
-      
-      if l:find("queen") or l:find("princess") or l:find("drone") then
-        local moved = transferAcrossChain(#CONFIG.chain, 1, stack.size, i)
-        if moved and moved > 0 then
-          extracted = extracted + moved
-          
-          if l:find("princess") then
-            STATE.queens_produced = STATE.queens_produced + 1
-          end
-          
-          log("Wyjeto: " .. stack.label .. " x" .. moved, "EXTRACT")
+    if stack and stack.individual then
+      local label = stack.label:lower()
+      local moved = transferAcrossChain(#CONFIG.chain, 1, stack.size, i)
+      if moved and moved > 0 then
+        extracted = extracted + moved
+        
+        if label:find("princess") then
+          STATE.queens_produced = STATE.queens_produced + 1
         end
+        
+        log("Wyjeto: " .. stack.label .. " x" .. moved, "EXTRACT")
       end
     end
   end
@@ -660,6 +665,8 @@ local function main()
       os.sleep(1)
       
       refillFrames()
+      
+      STATE_selected_slots = {}
     else
       log("Brak pszczol", "WARN")
       os.sleep(30)
