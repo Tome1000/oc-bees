@@ -390,6 +390,7 @@ end
 local function scanAllUnscannedBees()
   -- Check if there are any unscanned bees before attempting scan
   local unscanned = findUnscannedInChest()
+  log("DEBUG: Znaleziono " .. #unscanned .. " niezeskanowanych", "DEBUG")
   if #unscanned == 0 then
     log("Wszystkie pszczoły są już przeskanowane", "INFO")
     return
